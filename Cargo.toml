@@ -1,0 +1,9 @@
+[package]
+name = "xw"
+version = "0.1.0"
+authors = ["Eric Hegnes <eric.hegnes@gmail.com>"]
+edition = "2018"
+
+[dependencies]
+x11 = { version = "*", features = ["xlib"] }
+libc = "*"
