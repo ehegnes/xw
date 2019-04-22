@@ -32,18 +32,30 @@ struct XBuilder {
 
 impl Default for XBuilder {
     fn default() -> Self {
-        XBuilder {
-            display: unsafe { xlib::XOpenDisplay(ptr::null()) },
-            visual_info: unsafe {
-                libc::malloc(std::mem::size_of::<xlib::XVisualInfo>()) as *mut xlib::XVisualInfo
-            },
-            attributes: unsafe {
-                libc::malloc(std::mem::size_of::<xlib::XSetWindowAttributes>())
-                    as *mut xlib::XSetWindowAttributes
-            },
-            window: xlib::Window::default(),
-            colormap: 0,
-            gc: ptr::null_mut(),
+        unsafe {
+            let display = xlib::XOpenDisplay(ptr::null());
+            let screen_num = xlib::XDefaultScreen(display);
+            let default_depth = xlib::XDefaultDepth(display, screen_num);
+            let default_visual_class = (*xlib::XDefaultVisual(display, screen_num)).class;
+            let visual_info =
+                libc::malloc(std::mem::size_of::<xlib::XVisualInfo>()) as *mut xlib::XVisualInfo;
+            xlib::XMatchVisualInfo(
+                display,
+                screen_num,
+                default_depth,
+                default_visual_class,
+                visual_info,
+            );
+
+            XBuilder {
+                display,
+                visual_info,
+                colormap: xlib::XDefaultColormap(display, screen_num),
+                attributes: libc::malloc(std::mem::size_of::<xlib::XSetWindowAttributes>())
+                    as *mut xlib::XSetWindowAttributes,
+                window: xlib::Window::default(),
+                gc: ptr::null_mut(),
+            }
         }
     }
 }
@@ -180,10 +192,8 @@ impl Drop for XBuilder {
         unsafe {
             libc::free(self.visual_info as *mut libc::c_void);
             libc::free(self.attributes as *mut libc::c_void);
-            if self.colormap != 0 {
-                xlib::XFreeColormap(self.display, self.colormap);
-            }
-            if self.gc != ptr::null_mut() {
+            xlib::XFreeColormap(self.display, self.colormap);
+            if !ptr::eq(self.gc, ptr::null_mut()) {
                 xlib::XFreeGC(self.display, self.gc);
             }
             xlib::XCloseDisplay(self.display);
