@@ -49,8 +49,12 @@ impl Default for XBuilder {
 }
 
 impl XBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Allows specification of a display name
-    fn with_display(display_name: &str) -> XBuilder {
+    pub fn with_display(display_name: &str) -> XBuilder {
         XBuilder {
             display: unsafe { xlib::XOpenDisplay(XStr(display_name).into()) },
             ..Default::default()
@@ -94,6 +98,7 @@ impl XBuilder {
         self
     }
 
+    /// Allows defining and adding a window separately.
     fn window(&mut self, window: Window) {
         unsafe {
             self.window = xlib::XCreateWindow(
@@ -131,23 +136,28 @@ impl XBuilder {
         }
     }
 
+    /// Defines a window within the builder pattern
     fn with_window(mut self, window: Window) -> Self {
         self.window(window);
         self
     }
 
+    /// Alias for [`x11::xlib::XDefaultRootWindow`]
     fn default_root_window(&self) -> c_ulong {
         unsafe { xlib::XDefaultRootWindow(self.display) }
     }
 
+    /// Alias for [`x11::xlib::XDefaultScreenOfDisplay`]
     fn default_screen_of_display(&self) -> *mut xlib::Screen {
         unsafe { xlib::XDefaultScreenOfDisplay(self.display) }
     }
 
+    /// Alias for [`x11::xlib::XDefaultScreen`]
     fn default_screen(&self) -> i32 {
         unsafe { xlib::XDefaultScreen(self.display) }
     }
 
+    /// Wait for [`x11::xlib::MayNotify`] and flush to render updates
     fn flush(&self) {
         unsafe {
             // Wait for the MapNotify event
@@ -229,7 +239,7 @@ mod tests {
     }
 
     //#[test]
-    fn window() {
+    fn separate_window() {
         let mut x = XBuilder::default()
             .visual(VisualInfo::default())
             .colormap()

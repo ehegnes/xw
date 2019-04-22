@@ -26,6 +26,10 @@ impl Default for VisualInfo {
 }
 
 impl VisualInfo {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     pub fn depth(mut self, depth: i32) -> Self {
         self.depth = depth;
         self

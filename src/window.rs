@@ -39,6 +39,11 @@ impl Default for Window {
 }
 
 impl Window {
+    /// Creates a new [`Window`] with default values.
+    pub fn new() -> Self {
+        Self::default()
+    }
+
     /// Set the window's name
     pub fn name<T: Into<String>>(mut self, name: T) -> Self {
         self.name = name.into();
