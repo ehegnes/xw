@@ -6,6 +6,8 @@ extern crate libc;
 extern crate x11;
 
 pub mod attributes;
+pub mod color;
+pub mod draw;
 pub mod visualinfo;
 pub mod window;
 pub mod xstr;
@@ -16,6 +18,7 @@ use std::{mem, ptr};
 use x11::xlib;
 
 use attributes::WindowAttributes;
+use color::Colors;
 use visualinfo::VisualInfo;
 use window::Window;
 use xstr::XStr;
@@ -28,6 +31,7 @@ struct XBuilder {
     attributes: *mut xlib::XSetWindowAttributes,
     window: xlib::Window,
     gc: xlib::GC,
+    colors: Colors,
 }
 
 impl Default for XBuilder {
@@ -60,6 +64,7 @@ impl Default for XBuilder {
                 colormap: xlib::XDefaultColormap(display, screen_num),
                 window: xlib::Window::default(),
                 gc: ptr::null_mut(),
+                colors: Colors::default(),
             }
         }
     }
@@ -70,12 +75,40 @@ impl XBuilder {
         Self::default()
     }
 
-    /// Allows specification of a display name
-    /// TODO: fix this to work with the new way that `XBuilder::Default` is implemented.
-    fn with_display(display_name: &str) -> XBuilder {
-        XBuilder {
-            display: unsafe { xlib::XOpenDisplay(XStr(display_name).into()) },
-            ..Default::default()
+    pub fn add_color<T: Into<String> + Clone>(&mut self, name: T) {
+        unsafe {
+            let mut color = mem::uninitialized();
+            xlib::XAllocNamedColor(
+                self.display,
+                self.colormap,
+                CString::new(name.clone().into().as_str()).unwrap().as_ptr(),
+                &mut color,
+                &mut color,
+            );
+            self.colors.insert(name.into(), &mut color);
+        }
+    }
+
+    /// Set the global foreground color
+    /// TODO: Extend this to be per-window
+    pub fn set_foreground<T: Into<String> + Clone>(&self, name: T) {
+        let color = *self
+            .colors
+            .get(&name.into())
+            .expect("Could not find named color.");
+        unsafe {
+            xlib::XSetForeground(self.display, self.gc, (*color).pixel);
+        }
+    }
+
+    /// Set the global background color
+    pub fn set_background<T: Into<String> + Clone>(&self, name: T) {
+        let color = *self
+            .colors
+            .get(&name.into())
+            .expect("Could not find named color.");
+        unsafe {
+            xlib::XSetBackground(self.display, self.gc, (*color).pixel);
         }
     }
 
