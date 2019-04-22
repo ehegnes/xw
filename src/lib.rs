@@ -12,7 +12,7 @@ pub mod xstr;
 
 use libc::c_ulong;
 use std::ffi::CString;
-use std::ptr;
+use std::{mem, ptr};
 use x11::xlib;
 
 use attributes::WindowAttributes;
@@ -23,7 +23,7 @@ use xstr::XStr;
 #[derive(Clone)]
 struct XBuilder {
     display: *mut xlib::Display,
-    visual_info: *mut xlib::XVisualInfo,
+    visual_info: xlib::XVisualInfo,
     colormap: c_ulong,
     attributes: *mut xlib::XSetWindowAttributes,
     window: xlib::Window,
@@ -35,24 +35,29 @@ impl Default for XBuilder {
         unsafe {
             let display = xlib::XOpenDisplay(ptr::null());
             let screen_num = xlib::XDefaultScreen(display);
+
             let default_depth = xlib::XDefaultDepth(display, screen_num);
             let default_visual_class = (*xlib::XDefaultVisual(display, screen_num)).class;
-            let visual_info =
-                libc::malloc(std::mem::size_of::<xlib::XVisualInfo>()) as *mut xlib::XVisualInfo;
+            let mut visual_info = mem::uninitialized();
             xlib::XMatchVisualInfo(
                 display,
                 screen_num,
                 default_depth,
                 default_visual_class,
-                visual_info,
+                &mut visual_info,
             );
+
+            let attributes = libc::malloc(std::mem::size_of::<xlib::XSetWindowAttributes>())
+                as *mut xlib::XSetWindowAttributes;
+            let _attributes = WindowAttributes::from_display(display);
+            (*attributes).border_pixel = _attributes.border_pixel;
+            (*attributes).background_pixel = _attributes.background_pixel;
 
             XBuilder {
                 display,
                 visual_info,
+                attributes,
                 colormap: xlib::XDefaultColormap(display, screen_num),
-                attributes: libc::malloc(std::mem::size_of::<xlib::XSetWindowAttributes>())
-                    as *mut xlib::XSetWindowAttributes,
                 window: xlib::Window::default(),
                 gc: ptr::null_mut(),
             }
@@ -66,7 +71,8 @@ impl XBuilder {
     }
 
     /// Allows specification of a display name
-    pub fn with_display(display_name: &str) -> XBuilder {
+    /// TODO: fix this to work with the new way that `XBuilder::Default` is implemented.
+    fn with_display(display_name: &str) -> XBuilder {
         XBuilder {
             display: unsafe { xlib::XOpenDisplay(XStr(display_name).into()) },
             ..Default::default()
@@ -74,32 +80,33 @@ impl XBuilder {
     }
 
     /// Sets [`XVisualInfo`](x11::xlib::XVisualInfo)
-    fn visual(self, visual_info: VisualInfo) -> Self {
+    fn visual(mut self, visual_info: VisualInfo) -> Self {
         unsafe {
             xlib::XMatchVisualInfo(
                 self.display,
                 self.default_screen(),
                 visual_info.depth,
                 visual_info.class as i32,
-                self.visual_info,
+                &mut self.visual_info,
             );
         }
         self
     }
 
-    // XXX: Should this be abstracted?
+    /// TODO: Abstract this or remove it
     fn colormap(mut self) -> Self {
         unsafe {
             self.colormap = xlib::XCreateColormap(
                 self.display,
                 self.default_root_window(),
-                (*self.visual_info).visual,
+                self.visual_info.visual,
                 xlib::AllocNone,
             );
         }
         self
     }
 
+    /// TODO: Abstract this
     fn attributes(mut self) -> Self {
         let attributes = WindowAttributes::from_display(self.display);
         unsafe {
@@ -111,7 +118,7 @@ impl XBuilder {
     }
 
     /// Allows defining and adding a window separately.
-    fn window(&mut self, window: Window) {
+    pub fn window(&mut self, window: Window) {
         unsafe {
             self.window = xlib::XCreateWindow(
                 self.display,
@@ -121,9 +128,9 @@ impl XBuilder {
                 window.width,
                 window.height,
                 window.border_width,
-                (*self.visual_info).depth,
+                self.visual_info.depth,
                 window.class as u32,
-                (*self.visual_info).visual,
+                self.visual_info.visual,
                 window.valuemask,
                 self.attributes,
             );
@@ -149,7 +156,7 @@ impl XBuilder {
     }
 
     /// Defines a window within the builder pattern
-    fn with_window(mut self, window: Window) -> Self {
+    pub fn with_window(mut self, window: Window) -> Self {
         self.window(window);
         self
     }
@@ -170,7 +177,7 @@ impl XBuilder {
     }
 
     /// Wait for [`x11::xlib::MayNotify`] and flush to render updates
-    fn flush(&self) {
+    pub fn flush(&self) {
         unsafe {
             // Wait for the MapNotify event
             loop {
@@ -190,7 +197,7 @@ impl XBuilder {
 impl Drop for XBuilder {
     fn drop(&mut self) {
         unsafe {
-            libc::free(self.visual_info as *mut libc::c_void);
+            //libc::free(self.visual_info as *mut libc::c_void);
             libc::free(self.attributes as *mut libc::c_void);
             xlib::XFreeColormap(self.display, self.colormap);
             if !ptr::eq(self.gc, ptr::null_mut()) {
@@ -206,66 +213,47 @@ mod tests {
     use super::*;
 
     #[test]
-    fn default() {
-        XBuilder::default();
+    fn new() {
+        XBuilder::new();
     }
 
     #[test]
     fn visual() {
-        XBuilder::default().visual(VisualInfo::default());
+        XBuilder::new().visual(VisualInfo::new());
     }
 
     #[test]
     fn colormap() {
-        XBuilder::default().visual(VisualInfo::default()).colormap();
+        XBuilder::new().colormap();
     }
 
     #[test]
     fn attributes() {
-        XBuilder::default()
-            .visual(VisualInfo::default())
-            .colormap()
-            .attributes();
+        XBuilder::new().attributes();
     }
 
-    //#[test]
+    #[test]
     fn with_window() {
-        XBuilder::default()
-            .visual(VisualInfo::default())
-            .colormap()
-            .attributes()
-            .with_window(Window::default().width(100).height(100))
-            .flush();
+        XBuilder::new().with_window(Window::new());
     }
 
-    //#[test]
+    #[test]
     fn flush() {
-        XBuilder::default()
-            .visual(VisualInfo::default())
-            .colormap()
-            .attributes()
-            .with_window(Window::default().x(100).y(100).width(200).height(200))
-            .flush();
+        XBuilder::new().with_window(Window::new()).flush();
     }
 
-    //#[test]
+    #[test]
     fn separate_window() {
-        let mut x = XBuilder::default()
-            .visual(VisualInfo::default())
-            .colormap()
-            .attributes();
-        let window = Window::default().x(100).y(100).width(200).height(200);
+        let mut x = XBuilder::new();
+        let window = Window::new();
         x.window(window);
         x.flush();
     }
 
     #[test]
     fn window_name() {
-        let mut x = XBuilder::default()
-            .visual(VisualInfo::default())
-            .colormap()
-            .attributes()
-            .with_window(Window::default().name("Test Name"))
+        XBuilder::new()
+            .with_window(Window::new().name("Test Name"))
             .flush();
     }
 }
