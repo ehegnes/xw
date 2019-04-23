@@ -10,8 +10,8 @@ pub struct WindowAttributes {
 impl WindowAttributes {
     pub fn from_display(display: *mut Display) -> Self {
         WindowAttributes {
-            border_pixel: unsafe { XBlackPixel(display, XDefaultScreen(display)) },
-            background_pixel: unsafe { XWhitePixel(display, XDefaultScreen(display)) },
+            border_pixel: unsafe { XWhitePixel(display, XDefaultScreen(display)) },
+            background_pixel: unsafe { XBlackPixel(display, XDefaultScreen(display)) },
         }
     }
 
