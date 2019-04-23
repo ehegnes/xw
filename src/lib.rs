@@ -76,18 +76,18 @@ impl XBuilder {
 
     pub fn add_color(mut self, name: &'static str) -> Self {
         unsafe {
-            let mut color = mem::uninitialized();
+            let color: *mut xlib::XColor = mem::uninitialized();
             xlib::XAllocNamedColor(
                 self.display,
                 self.colormap,
                 // XXX: this leaks memory because of `into_raw()`, but
                 //      `as_ptr()` doesn't give string ownership to X, which
                 //      seems to be required in `XAllocNamedColor()`.
-                CString::new(name).unwrap().into_raw(),
-                &mut color,
-                &mut color,
+                CString::new(name).unwrap().as_ptr(),
+                color,
+                color,
             );
-            self.colors.insert(name, &mut color);
+            self.colors.insert(name, color);
             self
         }
     }
