@@ -74,15 +74,17 @@ impl XBuilder {
         Self::default()
     }
 
+    /// Allocates a named color to be later used by [`XBuilder::set_foreground`] and alike functions
+    ///
+    /// TODO:
+    /// - Use XParseColor and XAllocColor to allow users to specify RGB values directly
+    /// - Consider usage of Xft
     pub fn add_color(mut self, name: &'static str) -> Self {
         unsafe {
             let mut color = mem::uninitialized();
             xlib::XAllocNamedColor(
                 self.display,
                 self.colormap,
-                // XXX: this leaks memory because of `into_raw()`, but
-                //      `as_ptr()` doesn't give string ownership to X, which
-                //      seems to be required in `XAllocNamedColor()`.
                 CString::new(name).unwrap().as_ptr(),
                 &mut color,
                 &mut color,
@@ -93,8 +95,10 @@ impl XBuilder {
     }
 
     /// Set the global foreground color
-    /// TODO: Extend this to be per-window
+    /// TODO: Extend this to be per-window. I'll likely also want separate
+    /// graphics contexts (GCs) for each window.
     pub fn set_foreground(self, name: &'static str) -> Self {
+        // TODO: add proper error handling
         let color = *self.colors.get(name).expect("Could not find named color.");
         unsafe {
             xlib::XSetForeground(self.display, self.gc, color.pixel);
@@ -104,6 +108,7 @@ impl XBuilder {
 
     /// Set the global background color
     pub fn set_background(self, name: &'static str) {
+        // TODO: add proper error handling
         let color = *self.colors.get(name).expect("Could not find named color.");
         unsafe {
             xlib::XSetBackground(self.display, self.gc, color.pixel);
