@@ -1,4 +1,4 @@
-use libc::{c_short, malloc};
+use libc::c_short;
 use x11::xlib;
 
 pub trait Drawable {
@@ -114,7 +114,7 @@ mod tests {
     use crate::window::Window;
     use crate::XBuilder;
 
-    //#[test]
+    #[test]
     fn point() {
         XBuilder::new()
             .with_window(Window::new().name("Drawable Point").width(100).height(100))

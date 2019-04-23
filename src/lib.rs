@@ -264,37 +264,37 @@ impl Drop for XBuilder {
 mod tests {
     use super::*;
 
-    //#[test]
+    #[test]
     fn new() {
         XBuilder::new();
     }
 
-    //#[test]
+    #[test]
     fn visual() {
         XBuilder::new().visual(VisualInfo::new());
     }
 
-    //#[test]
+    #[test]
     fn colormap() {
         XBuilder::new().colormap();
     }
 
-    //#[test]
+    #[test]
     fn attributes() {
         XBuilder::new().attributes();
     }
 
-    //#[test]
+    #[test]
     fn with_window() {
         XBuilder::new().with_window(Window::new());
     }
 
-    //#[test]
+    #[test]
     fn flush() {
         XBuilder::new().with_window(Window::new()).flush();
     }
 
-    //#[test]
+    #[test]
     fn separate_window() {
         let mut x = XBuilder::new();
         let window = Window::new();
@@ -302,7 +302,7 @@ mod tests {
         x.flush();
     }
 
-    //#[test]
+    #[test]
     fn window_name() {
         XBuilder::new()
             .with_window(Window::new().name("Test Name"))
