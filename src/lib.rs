@@ -12,9 +12,9 @@ pub mod visualinfo;
 pub mod window;
 
 use libc::{c_int, c_ulong};
-use std::ffi::CString;
+use std::ffi::{CStr, CString};
 use std::{mem, ptr};
-use x11::xlib;
+use x11::{keysym, xlib};
 
 use attributes::WindowAttributes;
 use color::Colors;
@@ -183,7 +183,11 @@ impl XBuilder {
             CString::from_raw(name);
             Box::from_raw(class_hints);
 
-            xlib::XSelectInput(self.display, self.window, xlib::StructureNotifyMask);
+            xlib::XSelectInput(
+                self.display,
+                self.window,
+                xlib::KeyPressMask | xlib::StructureNotifyMask,
+            );
             xlib::XMapWindow(self.display, self.window);
 
             // TODO: abstract
@@ -213,22 +217,23 @@ impl XBuilder {
     }
 
     /// Flush to display
-    pub fn flush(&self) {
+    pub fn flush(self) -> Self {
         unsafe {
             xlib::XFlush(self.display);
         }
-
-        // XXX: temporary for debugging purposes
-        std::thread::sleep(std::time::Duration::from_secs(3));
+        self
     }
 
+    /// Draw a [`Drawable`] item
+    ///
+    /// TODO: This should eventually use a collection to store drawables
     pub fn draw<T: Drawable>(self, drawable: T) -> Self {
         // Wait for the MapNotify event
         unsafe {
             loop {
                 let mut e = xlib::XEvent { pad: [0; 24] };
                 xlib::XNextEvent(self.display, &mut e);
-                if e.type_ == xlib::MapNotify {
+                if e.get_type() == xlib::MapNotify {
                     break;
                 }
             }
@@ -236,25 +241,35 @@ impl XBuilder {
         drawable.draw(self.display, self.window, self.gc);
         self
     }
+
+    /// Run main event loop
+    ///
+    /// TODO: Should this handle redraw on Expose events?
+    pub fn run(self) {
+        unsafe {
+            loop {
+                let mut e = xlib::XEvent { pad: [0; 24] };
+                xlib::XNextEvent(self.display, &mut e);
+                match e.get_type() {
+                    xlib::KeyPress => {
+                        let event = xlib::XKeyEvent::from(e);
+                        let keysym = xlib::XKeycodeToKeysym(self.display, event.keycode as u8, 0);
+                        let keystr = CStr::from_ptr(xlib::XKeysymToString(keysym));
+                        println!("Key: {:?} {:?}", keystr, keysym);
+                        if keysym == keysym::XK_q as u64 {
+                            break;
+                        };
+                    }
+                    _ => (println!("XEvent: {:?}", e)),
+                }
+            }
+        }
+    }
 }
 
 impl Drop for XBuilder {
     fn drop(&mut self) {
         unsafe {
-            // XXX: Learn why this doesn't work
-            /*
-             *xlib::XFreeColors(
-             *    self.display,
-             *    self.colormap,
-             *    self.colors
-             *        .values()
-             *        .map(|&x| (*x).pixel)
-             *        .collect::<Vec<c_ulong>>()
-             *        .as_mut_ptr(),
-             *    self.colors.len() as i32,
-             *    0,
-             *);
-             */
             libc::free(self.attributes as *mut libc::c_void);
             xlib::XFreeColormap(self.display, self.colormap);
             if !ptr::eq(self.gc, ptr::null_mut()) {
@@ -312,5 +327,13 @@ mod tests {
         XBuilder::new()
             .with_window(Window::new().name("Test Name"))
             .flush();
+    }
+
+    #[test]
+    fn run() {
+        XBuilder::new()
+            .with_window(Window::new().name("Test Name"))
+            .flush()
+            .run();
     }
 }
