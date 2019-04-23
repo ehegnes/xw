@@ -23,7 +23,7 @@ use visualinfo::VisualInfo;
 use window::Window;
 
 #[derive(Clone)]
-struct XBuilder {
+pub struct XBuilder {
     display: *mut xlib::Display,
     visual_info: xlib::XVisualInfo,
     colormap: c_ulong,
@@ -76,7 +76,7 @@ impl XBuilder {
 
     pub fn add_color(mut self, name: &'static str) -> Self {
         unsafe {
-            let color: *mut xlib::XColor = mem::uninitialized();
+            let mut color = mem::uninitialized();
             xlib::XAllocNamedColor(
                 self.display,
                 self.colormap,
@@ -84,8 +84,8 @@ impl XBuilder {
                 //      `as_ptr()` doesn't give string ownership to X, which
                 //      seems to be required in `XAllocNamedColor()`.
                 CString::new(name).unwrap().as_ptr(),
-                color,
-                color,
+                &mut color,
+                &mut color,
             );
             self.colors.insert(name, color);
             self
@@ -97,7 +97,7 @@ impl XBuilder {
     pub fn set_foreground(self, name: &'static str) -> Self {
         let color = *self.colors.get(name).expect("Could not find named color.");
         unsafe {
-            xlib::XSetForeground(self.display, self.gc, (*color).pixel);
+            xlib::XSetForeground(self.display, self.gc, color.pixel);
         }
         self
     }
@@ -106,7 +106,7 @@ impl XBuilder {
     pub fn set_background(self, name: &'static str) {
         let color = *self.colors.get(name).expect("Could not find named color.");
         unsafe {
-            xlib::XSetBackground(self.display, self.gc, (*color).pixel);
+            xlib::XSetBackground(self.display, self.gc, color.pixel);
         }
     }
 
