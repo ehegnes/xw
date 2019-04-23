@@ -142,13 +142,17 @@ impl XBuilder {
         self
     }
 
-    /// TODO: Abstract this
-    fn attributes(mut self) -> Self {
-        let attributes = WindowAttributes::from_display(self.display);
+    /// Sets window attributes
+    fn attributes(mut self, attributes: WindowAttributes) -> Self {
         unsafe {
-            (*self.attributes).colormap = self.colormap;
             (*self.attributes).border_pixel = attributes.border_pixel;
             (*self.attributes).background_pixel = attributes.background_pixel;
+            xlib::XChangeWindowAttributes(
+                self.display,
+                self.window,
+                xlib::CWBorderPixel | xlib::CWBackPixel,
+                self.attributes,
+            );
         }
         self
     }
