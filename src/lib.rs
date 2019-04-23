@@ -50,9 +50,6 @@ impl Default for XBuilder {
                 &mut visual_info,
             );
 
-            println!("default_depth: {:?}", default_depth);
-            println!("default_visual_class: {:?}", default_visual_class);
-
             let attributes = libc::malloc(std::mem::size_of::<xlib::XSetWindowAttributes>())
                 as *mut xlib::XSetWindowAttributes;
             let _attributes = WindowAttributes::from_display(display);
@@ -90,7 +87,6 @@ impl XBuilder {
                 &mut color,
                 &mut color,
             );
-            println!("added color: {:?}", color);
             self.colors.insert(name, &mut color);
             self
         }
@@ -101,7 +97,6 @@ impl XBuilder {
     pub fn set_foreground(self, name: &'static str) -> Self {
         let color = *self.colors.get(name).expect("Could not find named color.");
         unsafe {
-            println!("using color as foreground: {:?}", *color);
             xlib::XSetForeground(self.display, self.gc, (*color).pixel);
         }
         self
